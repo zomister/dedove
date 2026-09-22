@@ -6,9 +6,9 @@ export default function App() {
     const [status, setStatus] = useState<string>('... L O A D I N G ...')
 
     useEffect(() => {
-        fetch('/api/health')
+        fetch('/api/v1/health')
             .then((res) => {
-                if (!res.ok) throw new Error('HTTP ${res.status}')
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
                 return res.json() as Promise<HealthResponse>
             })
             .then((data) => setStatus(data.status.toUpperCase()))
@@ -18,7 +18,7 @@ export default function App() {
     return (
         <>
             <p>Think different Academy</p>
-            <p>Status: ${status}</p>
+            <p>Status: {status}</p>
         </>
     )
 }
