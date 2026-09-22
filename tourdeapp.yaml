@@ -4,6 +4,23 @@ containers:
   - name: web
     image: registry.tourde.cloud/d_edove/web
     port: 80
+    env:
+      PORT: "80"
+      DB_HOST: localhost
+      DB_PORT: "3306"
+      DB_USER: dedove
+      DB_PASSWORD: dedove
+      DB_NAME: dedove
+  - name: mysql
+    image: mysql
+    tag: "8.0"
+    port: 3306
+    env:
+      MYSQL_DATABASE: dedove
+      MYSQL_USER: dedove
+      MYSQL_PASSWORD: dedove
+      MYSQL_ROOT_PASSWORD: dedove
 build:
   - name: web
     context: .
+    dockerfile: ./Dockerfile

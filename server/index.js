@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './db.js';
+import { pool, initDb } from './db.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 80
@@ -51,3 +51,4 @@ app.listen(port, () => {
     console.log(`Server's listening on port ${port}`)
 });
 
+initDb();
