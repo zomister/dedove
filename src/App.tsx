@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 type HealthResponse = { status: string };
 
 export default function App() {
-    const [status, setStatus] = useState<string>('Stand by.. Loading...')
+    const [status, setStatus] = useState<string>('... L O A D I N G ...')
 
     useEffect(() => {
         fetch('/api/health')
@@ -18,7 +18,7 @@ export default function App() {
     return (
         <>
             <p>Think different Academy</p>
-            <p>Status: {status}</p>
+            <p>Status: ${status}</p>
         </>
     )
 }
