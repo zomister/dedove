@@ -7,17 +7,17 @@ const port = Number(process.env.PORT) || 80
 const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
 const api = express.Router();
 
-api.get('/health', (req, res) => {
+api.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' })
 });
 
-api.use((req, res) => {
+api.use((_req, res) => {
     res.status(404).json({ error: 'Not Found' });
 });
-
 app.use(express.static(distDir));
+app.use('/api/v1', api);
 
-app.get('/{*splat}', (req, res) => {
+app.get('/{*splat}', (_req, res) => {
     res.sendFile(path.join(distDir, 'index.html'))
 });
 
