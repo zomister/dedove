@@ -15,10 +15,15 @@ export default function App() {
             .catch(() => setStatus('ERROR'))
     }, [])
 
+    const teamName = '(Ď)Edové'
+    const teamMembers: string[] = ['Jakub Skramuský', 'Kristián Pěnička', 'Miroslav Štecha']
+
     return (
         <>
             <p>Think different Academy</p>
             <p>Status: {status}</p>
+            <p>{teamName}</p>
+            <p>{teamMembers.join(', ')}</p>
         </>
     )
 }
