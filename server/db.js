@@ -25,6 +25,43 @@ export async function initDb({ retries = 30, delayMs = 2000 } = {}) {
             conn = await mysql.createConnection({ ...config, multipleStatements: true });
             await conn.query(schema);
             console.log('Database schema applied');
+
+            const stopsPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'data/stops.csv');
+
+            async function seedStops(conn) {
+                const [header, ...lines] = (await fs.readFile(stopsPath, 'utf8')).trim().split('\n');
+                const keys = header.split(',');
+                for (const line of lines) {
+                    const row = Object.fromEntries(keys.map((key, i) => [key, line.split(',')[i]]));
+                    const filename = row.name
+                        .replace(/\s+(\w)/g, (_, char) => char.toUpperCase())
+                        .replace(/^./, (char) => char.toLowerCase());
+                
+                        await conn.query(`
+                        INSERT INTO stops
+                        (id, name, image_url, is_transfer, x, y, wheelchair_accessible,
+                        has_shelter, has_bench, has_ticket_machine, has_display)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                        name = VALUES(name),
+                        image_url = VALUES(image_url),
+                        is_transfer = VALUES(is_transfer),
+                        x = VALUES(x),
+                        y = VALUES(y),
+                        wheelchair_accessible = VALUES(wheelchair_accessible),
+                        has_shelter = VALUES(has_shelter),
+                        has_bench = VALUES(has_bench),
+                        has_ticket_machine = VALUES(has_ticket_machine),
+                        has_display = VALUES(has_display)
+                    `, [
+                        row.id, row.name, `/stops/${filename}.png`, row.is_transfer === 'true',
+                        row.x, row.y, row.wheelchair_accessible === 'true',
+                        row.has_shelter === 'true', row.has_bench === 'true',
+                        row.has_ticket_machine === 'true', row.has_display === 'true',
+                    ]);
+                }
+            }
+            await seedStops(conn)
             return;
         } catch (err) {
             console.warn(`DB init attempt ${attempt}/${retries} failed:`, err.code ?? err.message);
