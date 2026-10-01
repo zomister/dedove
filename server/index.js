@@ -80,6 +80,25 @@ api.get("/stops/:stopId", async (req, res) => {
   res.json(stop);
 });
 
+api.get("/stops/search", async (req, res) => {
+  let rows;
+  try {
+    [rows] = await pool.query(`
+       SELECT s.id AS id, s.name AS name, s.image_url AS image_url, s.is_transfer AS is_transfer,
+        s.x AS x, s.y AS y, s.wheelchair_accessible AS wheelchair_accessible, s.has_shelter AS has_shelter,
+        s.has_bench AS has_bench, s.has_ticket_machine AS has_ticket_machine, s.has_display AS has_display
+        FROM stops s`);
+  } catch (err) {
+    console.error("GET /stops failed:", err.code ?? err);
+    return res.status(500).json({ error: "Database error" });
+  }
+  const stops = new Map();
+  for (const r of rows) {
+    stops.set(r.id, { id: r.id, name: r.name, image_url: r.image_ur, is_transfer: r.is_transfer, x: r.x, y: r.y, wheelchair_accessible: r.wheelchair_accessible, has_shelter: r.has_shelter, has_bench: r.has_bench, has_ticket_machine: r.has_ticket_machine, has_display: r.has_display });
+  }
+  res.json([...stops.values()]);
+});
+
 api.use((_req, res) => {
   res.status(404).json({ error: "Not Found" });
 });

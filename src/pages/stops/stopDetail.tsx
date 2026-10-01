@@ -38,7 +38,6 @@ export default function StopDetail() {
     <>
       <h1>Stop Detail:</h1>
       <ul>
-        <li>ID: {id}</li>
         <li>Name: {stop.name}</li>
         <li>Is Transfer: {stop.is_transfer ? "Yes" : "No"}</li>
         <li>X, Y: {stop.x}, {stop.y}</li>
