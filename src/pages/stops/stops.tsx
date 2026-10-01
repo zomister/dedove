@@ -5,6 +5,7 @@ type Stop = { id: number; name: string; image_url: string };
 
 export default function Stops() {
   const [stops, setStops] = useState<Stop[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetch("/api/v1/stops")
@@ -16,29 +17,14 @@ export default function Stops() {
       .catch(() => setStops([]));
   }, []);
 
-  function sortStops(searchTerm: string) {
-    const filteredStops = stops.filter((stop) => {
-      const searchWords = searchTerm.toLowerCase().trim().split(" ");
+const searchWords = searchTerm.toLowerCase().trim().split(" ");
 
-      const stopWords = stop.name.toLowerCase().split(" ");
-
-      return searchWords.every((searchWord) =>
-        stopWords.some((stopWord) => stopWord.startsWith(searchWord)),
-      );
-    });
-    console.log("searchTerm", searchTerm);
-    console.log("filteredStops", filteredStops);
-
-    if (searchTerm === "") {
-      setStops(stops);
-    } else {
-      setStops(filteredStops);
-    }
-    
-  }
-
-  
-  if (stops.length === 0) return <p>No stops available.</p>;
+const filteredStops = stops.filter((stop) => {
+  const stopWords = stop.name.toLowerCase().split(" ");
+  return searchWords.every((searchWord) => 
+    stopWords.some((stopWord) => stopWord.startsWith(searchWord)),
+  );
+});
 
   return (
     <>
@@ -47,10 +33,14 @@ export default function Stops() {
         type="search"
         placeholder="Search stops..."
         className="border p-2 mb-4 w-full"
-        onChange={(e) => sortStops(e.target.value)}
+        value = {searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
       />
+      {filteredStops.length === 0 ? (
+        <p>No stops found. :(</p>
+      ) : (
       <ul className="">
-        {stops.map((stop) => (
+        {filteredStops.map((stop) => (
           <li className="w-50" key={stop.id}>
             <Link to={`/stops/${stop.id}`} className="">
               <h2>{stop.name}</h2>
@@ -63,6 +53,7 @@ export default function Stops() {
           </li>
         ))}
       </ul>
+      )}
     </>
   );
 }
