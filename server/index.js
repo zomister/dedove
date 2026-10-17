@@ -10,6 +10,45 @@ const distDir = path.resolve(
   "../dist",
 );
 const api = express.Router();
+api.use(express.json());
+
+function toStop(row){
+  return {
+    id: row.id,
+    name: row.name,
+    image_url: row.image_url,
+    wheelchair_accessible: Boolean(row.wheelchair_accessible),
+    has_shelter: Boolean(row.has_shelter),
+    has_ticket_machine: Boolean(row.has_ticket_machine),
+  };
+}
+
+function validateStopInput(body){
+  if (typeof body !== "object" || body === null || Array.isArray(body)){
+    return "Body must be JSON (WHO IS JASON BRO)";
+  }
+  if (typeof body.name !== "string" || body.name.trim() === ""){
+    return "Name must be a (NON-EMPTY) string";
+  }
+  if (typeof body.wheelchair_accessible !== "boolean"){
+    return "wheelchair_accessible must be a boolean";
+  }
+  if (typeof body.has_shelter !== "boolean"){
+    return "has_shelter must be a boolean";
+  }
+  if (typeof body.has_ticket_machine !== "boolean"){
+    return "has_ticker_machine must be a boolean";
+  }
+
+  if(
+    body.image_url !== undefined && body.image_url !== null && typeof body.image_url !== "string"
+  ){
+    return "image_url must be a string or NULL";
+  }
+
+  return null;
+}
+
 
 api.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
@@ -44,18 +83,14 @@ api.get("/stops", async (_req, res) => {
   let rows;
   try {
     [rows] = await pool.query(`
-        SELECT s.id AS id, s.name AS name, s.image_url AS image_url
+        SELECT s.id AS id, s.name AS name, s.image_url AS image_url, s.wheelchair_accessible AS wheelchair_accessible, s.has_shelter AS has_shelter, s.has_ticket_machine AS has_ticket_machine
         FROM stops s
         ORDER BY s.id`);
   } catch (err) {
     console.error("GET /stops failed:", err.code ?? err);
     return res.status(500).json({ error: "Database error" });
   }
-  const stops = new Map();
-  for (const r of rows) {
-    stops.set(r.id, { id: r.id, name: r.name, image_url: r.image_url });
-  }
-  res.json([...stops.values()]);
+  res.json(rows.map(toStop));
 });
 
 api.get("/stops/search", async (req, res) => {
@@ -79,6 +114,7 @@ api.get("/stops/search", async (req, res) => {
 
 api.get("/stops/:stopId", async (req, res) => {
   const stopId = Number(req.params.stopId);
+  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
   let rows;
   try {
     [rows] = await pool.query(
@@ -96,9 +132,101 @@ api.get("/stops/:stopId", async (req, res) => {
   }
   const stop = rows[0];
   if (!stop) return res.status(404).json({ error: "Not Found" });
-  res.json(stop);
+  res.json({
+    ...toStop(stop),
+    is_transfer: Boolean(stop.is_transfer),
+    x: stop.x === null ? null : Number(stop.x),
+    y: stop.y === null ? null : Number(stop.y),
+    has_bench: Boolean(stop.has_bench),
+    has_display: Boolean(stop.has_display),
+  });
 });
 
+api.post("/stops", async (req, res) => {
+  const error = validateStopInput(req.body);
+  if (error) return res.status(400).json({ error });
+
+  const { name, wheelchair_accessible, has_shelter, has_ticket_machine } = req.body;
+  const image_url = req.body.image_url ?? null;
+
+  let result;
+  try {
+    [result] = await pool.query(
+      `INSERT INTO stops (name, image_url, wheelchair_accessible, has_shelter, has_ticket_machine) VALUES (?, ?, ?, ?, ?)`,
+      [name , image_url, wheelchair_accessible, has_shelter, has_ticket_machine],
+    );
+  } catch (err){
+    console.error("POST /stops failed: ", err.code ?? err);
+    return res.status(500).json({ error: "Database error" });
+  }
+
+  res.status(201).json({
+    id: result.insertId,
+    name,
+    image_url,
+    wheelchair_accessible,
+    has_shelter,
+    has_ticket_machine,
+  });
+});
+
+api.put("/stops/:stopId", async (req, res) => {
+  const stopId = Number(req.params.stopId);
+  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
+  const error = validateStopInput(req.body);
+  if (error) return res.status(400).json({ error });
+
+  const { name, wheelchair_accessible, has_shelter, has_ticket_machine } = req.body;
+  const image_url = req.body.image_url ?? null;
+
+  let result;
+  try {
+    [result] = await pool.query(
+      `UPDATE stops SET name = ?, image_url = ?, wheelchair_accessible = ?, has_shelter = ?, has_ticket_machine = ? WHERE id = ?`,
+      [name , image_url, wheelchair_accessible, has_shelter, has_ticket_machine, stopId],
+    );
+  } catch (err){
+    console.error("PUT /stops failed: ", err.code ?? err);
+    return res.status(500).json({ error: "Database error" });
+  }
+  if(result.affectedRows === 0) return res.status(404).json({ error: "Not Found" });
+
+  res.json({
+    id: stopId,
+    name,
+    image_url,
+    wheelchair_accessible,
+    has_shelter,
+    has_ticket_machine,
+  });
+});
+
+api.delete("/stops/:stopId", async (req, res) =>{
+  const stopId = Number(req.params.stopId);
+  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
+
+
+  let result;
+  try {
+    [result] = await pool.query(
+      `DELETE FROM stops WHERE id = ?`,
+      [stopId],
+    );
+  } catch (err){
+    console.error("DELETE /stops failed: ", err.code ?? err);
+    return res.status(500).json({ error: "Database error" });
+  }
+  if(result.affectedRows === 0) return res.status(404).json({ error: "Not Found" });
+
+  res.status(204).end();
+});
+
+api.use((err, _req, res, next) => {
+  if(err.type === "entity.parse.failed"){
+    return res.status(400).json({ error:"Invalid JSON "});
+  }
+  next(err);
+});
 
 api.use((_req, res) => {
   res.status(404).json({ error: "Not Found" });
