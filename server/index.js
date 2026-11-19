@@ -12,6 +12,20 @@ const distDir = path.resolve(
 const api = express.Router();
 api.use(express.json());
 
+const ALLOWED_FIELDS = new Set([
+  "name", "image_url", "wheelchair_accessible", "has_shelter", "has_ticket_machine",
+]);
+
+function isValid(value){
+  try{
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch{
+    return false;
+  }
+}
+
+
 function toStop(row){
   return {
     id: row.id,
@@ -24,29 +38,34 @@ function toStop(row){
 }
 
 function validateStopInput(body){
-  if (typeof body !== "object" || body === null || Array.isArray(body)){
-    return "Body must be JSON (WHO IS JASON BRO)";
-  }
+  if (typeof body !== "object" || body === null || Array.isArray(body))
+    return "Request body must be a JSON obj";
+
+  const extra = Object.keys(body).filter((k) => !ALLOWED_FIELDS.has(k));
+  if (extra.length) return `Unknown field: ${extra.join(", ")}`;
+  
   if (typeof body.name !== "string" || body.name.trim() === ""){
-    return "Name must be a (NON-EMPTY) string";
+    return "name must be a non-empty string";
   }
-  if (typeof body.wheelchair_accessible !== "boolean"){
-    return "wheelchair_accessible must be a boolean";
+  
+  if (body.name.length > 255) return "name mustn't be longer than 255 chars";
+  
+  for (const f of ["wheelchair_accessible", "has_shelter", "has_ticket_machine"]){
+    if (typeof body[f] !== "boolean") return `${f} must be a boolean`;
   }
-  if (typeof body.has_shelter !== "boolean"){
-    return "has_shelter must be a boolean";
+  
+  if (body.image_url !== undefined && body.image_url !== null){
+    if (typeof body.image_url !== "string") return "image_url must be a string or null";
+    if (body.image_url.length > 255) return "image_url must be 255 chars maximum";
+    if(!isValid(body.image_url)) return "image_url must be a valid URL";
   }
-  if (typeof body.has_ticket_machine !== "boolean"){
-    return "has_ticker_machine must be a boolean";
-  }
-
-  if(
-    body.image_url !== undefined && body.image_url !== null && typeof body.image_url !== "string"
-  ){
-    return "image_url must be a string or NULL";
-  }
-
   return null;
+}
+
+function parseStopId(raw){
+  if (!/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id >= 1 ? id : null;
 }
 
 
@@ -113,8 +132,8 @@ api.get("/stops/search", async (req, res) => {
 });
 
 api.get("/stops/:stopId", async (req, res) => {
-  const stopId = Number(req.params.stopId);
-  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
+  const stopId = parseStopId(req.params.stopId);
+  if (stopId === null) return res.status(400).json({ error: "Invalid stop ID" });
   let rows;
   try {
     [rows] = await pool.query(
@@ -131,7 +150,7 @@ api.get("/stops/:stopId", async (req, res) => {
     return res.status(500).json({ error: "Database error" });
   }
   const stop = rows[0];
-  if (!stop) return res.status(404).json({ error: "Not Found" });
+  if (!stop) return res.status(404).json({ error: "Stop not Found" });
   res.json({
     ...toStop(stop),
     is_transfer: Boolean(stop.is_transfer),
@@ -171,8 +190,8 @@ api.post("/stops", async (req, res) => {
 });
 
 api.put("/stops/:stopId", async (req, res) => {
-  const stopId = Number(req.params.stopId);
-  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
+  const stopId = parseStopId(req.params.stopId);
+  if (stopId === null) return res.status(400).json({ error: "Invalid stop ID" });
   const error = validateStopInput(req.body);
   if (error) return res.status(400).json({ error });
 
@@ -189,7 +208,7 @@ api.put("/stops/:stopId", async (req, res) => {
     console.error("PUT /stops failed: ", err.code ?? err);
     return res.status(500).json({ error: "Database error" });
   }
-  if(result.affectedRows === 0) return res.status(404).json({ error: "Not Found" });
+  if(result.affectedRows === 0) return res.status(404).json({ error: "Stop not Found" });
 
   res.json({
     id: stopId,
@@ -202,8 +221,8 @@ api.put("/stops/:stopId", async (req, res) => {
 });
 
 api.delete("/stops/:stopId", async (req, res) =>{
-  const stopId = Number(req.params.stopId);
-  if (!Number.isInteger(stopId)) return res.status(404).json({ error: "Not Found" });
+  const stopId = parseStopId(req.params.stopId);
+  if (stopId === null) return res.status(400).json({ error: "Invalid stop ID" });
 
 
   let result;
@@ -216,16 +235,15 @@ api.delete("/stops/:stopId", async (req, res) =>{
     console.error("DELETE /stops failed: ", err.code ?? err);
     return res.status(500).json({ error: "Database error" });
   }
-  if(result.affectedRows === 0) return res.status(404).json({ error: "Not Found" });
+  if(result.affectedRows === 0) return res.status(404).json({ error: "Stop not Found" });
 
   res.status(204).end();
 });
 
-api.use((err, _req, res, next) => {
-  if(err.type === "entity.parse.failed"){
-    return res.status(400).json({ error:"Invalid JSON "});
-  }
-  next(err);
+api.use((err, _req, res, _next) => {
+  if(err.type === "entity.parse.failed") return res.status(400).json({ error:"Invalid JSON"});
+  console.error(err);
+  res.status(err.status ?? 500).json({ error: err.status ? err.message : "Internal server error" });
 });
 
 api.use((_req, res) => {
