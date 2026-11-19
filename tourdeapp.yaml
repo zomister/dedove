@@ -11,6 +11,7 @@ containers:
       DB_USER: dedove
       DB_PASSWORD: dedove
       DB_NAME: dedove
+      API_KEY: Kyqc49jIM+5+D0Sed8ZQ671gxkd7W/bBTWjDtZ0Zrgk=
   - name: mysql
     image: mysql
     tag: "8.0"

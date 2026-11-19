@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool, initDb } from "./db.js";
+import crypto from "node:crypto";
 
 const app = express();
 const port = Number(process.env.PORT) || 80;
@@ -10,7 +11,25 @@ const distDir = path.resolve(
   "../dist",
 );
 const api = express.Router();
+api.use((req, res, next) => ["POST", "PUT", "DELETE"].includes(req.method) && req.path.startsWith("/stops") ? reqAdmin(req, res, next) : next());
 api.use(express.json());
+const API_KEY = process.env.API_KEY;
+
+function safeEqual(a, b){
+  const ha = crypto.createHash("sha256").update(a).digest();
+  const sh = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(ha, sh);
+}
+
+function reqAdmin(req, res, next){
+  const header = req.get("Authorization") ?? "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!API_KEY || !match || !safeEqual(match[1].trim(), API_KEY)){
+    res.set("WWW-Authenticate", "Bearer");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
 
 const ALLOWED_FIELDS = new Set([
   "name", "image_url", "wheelchair_accessible", "has_shelter", "has_ticket_machine",
