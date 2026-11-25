@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Dosis";
+  src: url("./assets/fonts/Dosis-VariableFont_wght.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  margin: 0;
+  font-family: "Dosis", sans-serif;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scheme-wave {
+    animation: scheme-wave 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes scheme-wave {
+    from { opacity: 0.14; }
+    to { opacity: 0.3; }
+  }
+}
